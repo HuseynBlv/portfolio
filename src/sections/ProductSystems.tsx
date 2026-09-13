@@ -10,7 +10,7 @@ export function ProductSystems() {
     <section className="py-24 md:py-32">
       <Container>
         <SectionHeading
-          eyebrow="Product / Applied Systems"
+          eyebrow="Product & Applied Systems"
           title="Where backend thinking meets a real problem."
           description="Applied AI, research, and product work — secondary to backend engineering, but shaped by the same instinct to understand what's actually happening underneath an idea before building it."
         />

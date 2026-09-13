@@ -28,16 +28,15 @@ export function Hero() {
 
         <Reveal delay={0.14}>
           <p className="mt-3 font-mono text-[13px] tracking-tight text-accent">
-            Java <span className="text-text-tertiary">·</span> Backend Systems{" "}
+            Java Backend <span className="text-text-tertiary">·</span> Systems{" "}
             <span className="text-text-tertiary">·</span> Product Engineering
           </p>
         </Reveal>
 
         <Reveal delay={0.18}>
           <p className="mt-7 max-w-xl text-[16px] leading-relaxed text-text-secondary md:text-[17px]">
-            I build backend systems around real workflows — from reservation
-            and ride-management systems to retail analytics and open-source
-            Java.
+            I build backend systems around real workflows — from reservations
+            and ride management to retail data and open-source Java.
           </p>
         </Reveal>
 
@@ -47,7 +46,7 @@ export function Hero() {
               href="#projects"
               className="rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-bg transition-opacity hover:opacity-90"
             >
-              View Projects
+              View Engineering Work
             </a>
             <a
               href={site.github}

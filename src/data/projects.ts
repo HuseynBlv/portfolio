@@ -68,7 +68,7 @@ export const projects: Project[] = [
   {
     slug: "ada-reservation-system",
     title: "ADA University Room Reservation System",
-    eyebrow: "Workflow & Approval Platform",
+    eyebrow: "Workflow / Scheduling / Backend",
     status: "Built",
     groups: ["selected", "backend"],
     tagline:
@@ -191,7 +191,7 @@ export const projects: Project[] = [
   {
     slug: "rideflow",
     title: "RideFlow",
-    eyebrow: "State Machine & Domain Modeling",
+    eyebrow: "Java / Spring Boot / Domain Modeling",
     status: "Built",
     groups: ["selected", "backend"],
     tagline:
@@ -305,7 +305,7 @@ export const projects: Project[] = [
   {
     slug: "testcontainers-java",
     title: "Testcontainers Java — Open Source Contribution",
-    eyebrow: "Contribution to an Established Java Project",
+    eyebrow: "Open Source / Testing / Docker",
     status: "Open Source",
     groups: ["selected", "backend"],
     tagline:
@@ -397,7 +397,7 @@ export const projects: Project[] = [
   {
     slug: "scan",
     title: "SCAN — Sales & Consumption Analytics Network",
-    eyebrow: "Retail Analytics Platform",
+    eyebrow: "Retail Data / Product Engineering",
     status: "Pilot-stage",
     groups: ["selected", "product"],
     tagline:
@@ -571,7 +571,7 @@ export const projects: Project[] = [
   {
     slug: "orchardguard-ai",
     title: "OrchardGuard AI",
-    eyebrow: "Agritech Concept",
+    eyebrow: "Concept / Bootcamp Project",
     status: "Concept",
     groups: ["product"],
     tagline:
