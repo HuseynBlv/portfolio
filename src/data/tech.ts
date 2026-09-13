@@ -12,7 +12,7 @@ export const techAreas: TechArea[] = [
   },
   {
     label: "Data",
-    items: ["PostgreSQL", "Redis", "Supabase"],
+    items: ["PostgreSQL", "SQL / PL-pgSQL", "Redis", "Supabase"],
   },
   {
     label: "Infrastructure / Tooling",
@@ -21,9 +21,5 @@ export const techAreas: TechArea[] = [
   {
     label: "Frontend / Product",
     items: ["React", "Next.js", "TypeScript", "JavaScript"],
-  },
-  {
-    label: "Other",
-    items: ["Go", "Networking"],
   },
 ];

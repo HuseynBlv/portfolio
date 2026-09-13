@@ -545,25 +545,6 @@ export const projects: Project[] = [
       "A layered backend where controllers, services, and repositories each have one job — with authentication, validation, and exception handling enforced consistently across every endpoint.",
   },
   {
-    slug: "onyx",
-    title: "Onyx",
-    eyebrow: "Peer-to-Peer Messaging",
-    status: "Prototype",
-    groups: ["backend"],
-    tagline:
-      "A peer-to-peer messaging project written in Go, exploring sockets, networking, and concurrency outside the request/response model.",
-    problem:
-      "Most of my backend work is request/response over HTTP — Onyx is a deliberate step outside that, into direct peer-to-peer communication.",
-    challenge:
-      "Handling concurrent socket connections and message delivery without the structure a web framework normally provides for free.",
-    architecture: {
-      steps: ["Peer", "Socket Connection", "Concurrent Handler", "Message Routing", "Peer"],
-    },
-    tech: ["Go", "Sockets", "Networking", "Concurrency"],
-    result:
-      "An exploration of peer-to-peer networking and concurrency in Go — deliberately outside the Java/Spring stack, to understand networking closer to the transport layer.",
-  },
-  {
     slug: "pulsenote",
     title: "PulseNote",
     eyebrow: "Landing Page & Idea Validation",
