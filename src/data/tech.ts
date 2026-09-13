@@ -20,10 +20,10 @@ export const techAreas: TechArea[] = [
   },
   {
     label: "Frontend / Product",
-    items: ["React", "TypeScript", "JavaScript"],
+    items: ["React", "Next.js", "TypeScript", "JavaScript"],
   },
   {
     label: "Other",
-    items: ["Go", "AI Integrations", "Networking"],
+    items: ["Go", "Networking"],
   },
 ];

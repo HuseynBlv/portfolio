@@ -72,128 +72,119 @@ export const projects: Project[] = [
     status: "Built",
     groups: ["selected", "backend"],
     tagline:
-      "A reservation and approval platform that turns ad-hoc room requests into a governed workflow — availability, conflicts, approvals, and notifications enforced as backend logic.",
+      "A reservation and approval platform built as a single Next.js app on Supabase Postgres — every sensitive write runs through a locked, transactional SQL function, not scattered application code, so double-booking is impossible at the database level.",
     problem:
       "Room requests at ADA University and USG were coordinated informally, with no system enforcing availability, approval order, or conflict rules consistently.",
     challenge:
-      "Correctly enforcing reservation rules under concurrent requests — preventing double-booking, respecting role-based approval authority, and keeping reservation state, calendar data, and notifications consistent with each other.",
+      "Correctly enforcing reservation rules under real concurrency — preventing double-booking, respecting role-based approval authority, and keeping reservation state and notifications consistent — without a separate backend service to own that logic.",
     architecture: {
       steps: [
-        "Reservation Request",
-        "Availability Check",
-        "Conflict Detection",
-        "Approval",
-        "Persistence (PostgreSQL)",
-        "Notification",
+        "Server Action",
+        "Postgres Function (Room-Locked)",
+        "RLS-Protected Tables",
+        "PostgreSQL (Supabase)",
+        "Email Outbox",
+        "Resend Delivery",
       ],
     },
     stateMachine: {
-      steps: [
-        "User Request",
-        "Authorization",
-        "Availability Check",
-        "Conflict Detection",
-        "Pending Reservation",
-        "USG Review",
-        "Approved / Rejected",
-        "Notification",
-      ],
+      label: "Reservation status (persisted)",
+      steps: ["PENDING", "APPROVED", "CANCELLED"],
     },
     anatomy: {
       domain:
-        "Rooms, bookable time slots, and reservation requests moving through a university approval hierarchy — a requester, and a USG reviewer with the authority to approve or reject.",
+        "Rooms, availability windows, and reservation requests moving through a university approval hierarchy — a requester, and an admin with USG's approval authority.",
       backendControls:
-        "Whether a reservation is even allowed to exist at a given time. The API enforces availability, checks for conflicts, and restricts who can move a request from pending to approved or rejected.",
+        "Whether a reservation is even allowed to exist at a given time. Every sensitive write — submit, approve, reject, cancel, modify — runs as a database function, not a direct table write, so authorization and business rules live in one place regardless of which client calls them.",
       businessRules: [
-        "A reservation cannot be approved if it overlaps an already-approved reservation for the same room.",
-        "Only a USG reviewer can transition a reservation to approved or rejected — the requester cannot.",
-        "A rejected or cancelled reservation must not continue to hold its time slot.",
+        "A reservation can only be approved if it doesn't overlap an already-approved reservation for the room — enforced by a database exclusion constraint, not just application logic.",
+        "Only an active admin can approve or reject a request; no client role has a direct write grant on the reservations table at all.",
+        "An approval re-checks availability and conflicts at decision time, not just at submission time, so a slow-to-decide admin can't approve something that's no longer valid.",
       ],
       dataStorage:
-        "PostgreSQL. Rooms, time slots, and reservations are modeled as related tables, with reservation status and the requester/reviewer stored as foreign keys — overlap checks run as time-range queries against this schema, not as in-memory filtering.",
+        "PostgreSQL via Supabase. Every write funnels through locked SQL functions — each one takes the room's row lock first, in the same order every time, before checking or changing anything. A partial exclusion constraint on the reservations table makes overlapping approved bookings impossible to insert, independent of any application code.",
       stateNote:
-        "A reservation is a state machine, not a row that gets overwritten — it can only reach 'approved' by passing through authorization, availability, and conflict checks in order.",
+        "The persisted state machine is small on purpose: PENDING → APPROVED or REJECTED, and APPROVED → CANCELLED. Availability and conflict checks are pre-conditions enforced inside the submit/approve functions, not separate stored states.",
       risks: [
-        "Two overlapping requests submitted at nearly the same time could both pass an availability check before either is committed, double-booking the room.",
-        "An email could fire for a status the database hasn't actually persisted yet, telling a user their reservation is approved when it isn't.",
+        "Two admins approving overlapping requests for the same room at nearly the same moment — one has to lose outright, not silently create a double-booking.",
+        "A retried submission after a dropped network response could create a duplicate reservation if the same request were processed twice.",
       ],
       safeguards:
-        "Overlap detection is expressed as a database query, not application-level filtering, so correctness doesn't depend on what the application happens to have loaded in memory. Approval authority is enforced by role at the API layer, and notifications are only triggered after a status change is committed — never alongside it.",
+        "Every scheduling function locks the room's row before doing anything, in a fixed order, so concurrent writes for the same room fully serialize — proven against two real concurrent connections, not just asserted. An idempotency-key table lets a retried submission reuse the same in-flight request instead of creating a duplicate, and the exclusion constraint is the final backstop even if that logic were ever wrong.",
     },
     tech: [
-      "Java",
-      "Spring Boot",
-      "PostgreSQL",
-      "REST APIs",
-      "Role-Based Access Control",
-      "Email Notifications",
+      "TypeScript",
+      "Next.js",
+      "PostgreSQL (Supabase)",
+      "Row-Level Security",
+      "SQL / PL-pgSQL",
+      "Transactional Functions",
     ],
     result:
-      "A working reservation platform where every request moves through a single enforced path — availability check, conflict detection, review, and notification — instead of relying on manual coordination.",
+      "Every scheduling write funnels through a locked Postgres function and a database exclusion constraint — proven against two real concurrent connections, with 121 pgTAP assertions covering authorization, locking, and the constraint directly.",
     hasCaseStudy: true,
+    links: [{ label: "GitHub", href: "https://github.com/HuseynBlv/C205" }],
     caseStudy: {
       context: [
         "ADA University's rooms and shared spaces were reserved informally — through messages, spreadsheets, and verbal agreements between students, staff, and USG (the university's student government, which reviews and approves space requests).",
         "That worked at low volume, but broke down as soon as two people wanted the same room, or a request needed sign-off from someone who wasn't in the conversation.",
       ],
       problem: [
-        "The system needed a single source of truth for who has a room, when, and under what authority. That meant modeling three things that are easy to get wrong independently and much harder to get right together: time-based availability, an approval hierarchy, and notification state.",
-        "A reservation is only correct if all three agree — a room can't be 'approved' if it was already booked in that window, and a user shouldn't be notified of a state the database hasn't actually committed to.",
+        "The system needed a single source of truth for who has a room, when, and under what authority — and it needed to hold up under real concurrency, not just look correct in a demo.",
+        "A reservation is only correct if availability, approval authority, and notification state all agree — a room can't be 'approved' if it was already booked in that window, and a user shouldn't be told their reservation is approved before the database has actually committed to it.",
       ],
       system: [
-        "The backend is organized around a reservation lifecycle rather than a CRUD resource. A request doesn't just get 'created' — it moves through authorization, availability checking, conflict detection, and review before it becomes a committed reservation.",
-        "Rooms, time slots, and reservations are modeled relationally so that overlap queries — 'is this room free between these two timestamps' — can be enforced at the database layer, not just checked in application code after the fact.",
-        "Role-based access control separates what a regular user can request from what a USG reviewer can approve or reject, with the API surface reflecting that separation rather than trusting the client to enforce it.",
+        "The whole app is one deployable Next.js unit with no separate backend service — every sensitive write (submit, approve, reject, cancel, modify) runs as a database function invoked from a Server Action, not a direct table write from application code.",
+        "Every one of those functions locks the room's row first, in the same order every time, before checking availability or writing anything — that's what makes 'two admins approve the same slot at once' resolve to exactly one winner instead of a race.",
+        "Row-Level Security is deny-by-default: default privileges are revoked schema-wide, so every table and function needs an explicit grant. No client role — not even an authenticated user — has a direct write grant on the reservations table; the only path in is through the locked functions.",
       ],
       engineeringChallenges: [
-        "Time-overlap detection: determining whether a new request conflicts with any existing reservation for the same room, without false positives on adjacent (non-overlapping) bookings.",
-        "Keeping reservation status, calendar availability, and notification delivery consistent — an approval that updates the database but fails to notify is a silent failure the user experiences as a broken system.",
-        "Modeling an approval workflow as backend state rather than as a UI flag, so that 'pending', 'approved', and 'rejected' are enforced transitions instead of arbitrary field updates.",
+        "Making 'is this room actually free' a database-level guarantee — a partial exclusion constraint that makes overlapping approved bookings physically impossible to insert, not just checked for in application code.",
+        "Serializing concurrent scheduling writes for one room without locking out unrelated rooms, and proving it against real concurrent connections rather than assuming a lock 'should' work.",
+        "Keeping notification delivery reliable without a dedicated message queue: a durable outbox table plus independent trigger paths, so a single point of failure can't silently drop an email.",
       ],
       architecture: {
         steps: [
-          "Reservation Request",
-          "Availability Check",
-          "Conflict Detection",
-          "Approval",
-          "Persistence (PostgreSQL)",
-          "Notification",
+          "Server Action",
+          "Postgres Function (Room-Locked)",
+          "RLS-Protected Tables",
+          "PostgreSQL (Supabase)",
+          "Email Outbox",
+          "Resend Delivery",
         ],
       },
       secondaryDiagram: {
-        label: "Reservation lifecycle",
+        label: "Booking engine — locked function order",
         steps: [
-          "User Request",
-          "Authorization",
-          "Availability Check",
-          "Conflict Detection",
-          "Pending Reservation",
-          "USG Review",
-          "Approved / Rejected",
-          "Notification",
+          "submit_request (lock room, validate, create PENDING)",
+          "approve_request (re-validate, lock, set APPROVED)",
+          "cancel_reservation (APPROVED to CANCELLED)",
         ],
       },
       decisions: [
         {
-          title: "Conflict detection at the query level",
-          body: "Overlap checks are expressed as time-range queries rather than loading all reservations for a room and filtering in application code. This keeps correctness anchored to the database rather than to whatever the application happens to have loaded in memory.",
+          title: "One app, no separate backend — but still a real authorization boundary",
+          body: "All data access runs as Next.js Server Actions calling Postgres directly, or through database functions for anything transactional. There's no separate API layer, but authorization is still centralized — in the database functions, not scattered across route handlers.",
         },
         {
-          title: "Approval as a distinct role, not a flag on the requester",
-          body: "USG review is modeled as a separate authority in the system, not a boolean a user could plausibly set on their own request. The API enforces who is allowed to transition a reservation from pending to approved or rejected.",
+          title: "Lock the room, not the whole table",
+          body: "Every scheduling function takes the specific room's row lock first, in a fixed order (room, then the reservation once its id is known). With a small number of rooms this fully serializes writes for the room being booked while leaving every other room's writes unaffected.",
         },
         {
-          title: "Notifications as a consequence of committed state",
-          body: "Emails are triggered after a reservation's status change is persisted, not alongside it — so a notification never claims a state the database hasn't actually reached.",
+          title: "An exclusion constraint as the backstop, not the only guard",
+          body: "Locking makes concurrent approvals correct in practice; the partial exclusion constraint on approved reservations is what makes an overlap impossible even if that locking logic were ever wrong — two independent layers, not one.",
         },
       ],
       result: [
-        "The result is a reservation platform where every request follows the same enforced path: authorization, availability, conflict detection, review, and notification — rather than depending on whoever happens to be coordinating manually.",
-        "This is presented as a built system reflecting the ADA/USG reservation workflow, not as a deployed, university-wide production service.",
+        "The concurrency guarantee is real, not just designed: two genuine concurrent connections attempting overlapping approvals were tested against the locked functions, and exactly one succeeded.",
+        "121 pgTAP assertions cover RLS/grant boundaries, function-level authorization, and the exclusion constraint directly, run against a real local Supabase/Postgres instance.",
+        "Email delivery was verified end to end with a real Resend API key and a real reservation — an actual email was sent and delivered, not simulated.",
+        "This is a built system reflecting the ADA/USG reservation workflow, exercised against real infrastructure — not a deployed, university-wide production service in active use.",
       ],
       learnings: [
-        "Modeling a workflow as explicit states — not just database columns — makes the rules the system enforces legible, both to future code and to whoever is reviewing it.",
-        "Most of the real difficulty in a 'simple' reservation system is concurrency and consistency, not the calendar UI on top of it.",
+        "A workflow's correctness guarantee doesn't have to live in a separate backend service — a Postgres function with the right locking and constraints can be exactly as authoritative as an application-layer service, sometimes more so, since the constraint holds even if the calling code is wrong.",
+        "Concurrency correctness is worth testing directly, not just reasoning about — a real two-connection proof-of-lock test catches what code review alone wouldn't.",
+        "The best guarantee lives closest to the data — a database exclusion constraint or RLS policy doesn't get bypassed by a bug two layers up in application code, the way an equivalent application-level check could.",
       ],
     },
   },
@@ -332,7 +323,7 @@ export const projects: Project[] = [
       ],
     },
     contribution:
-      "Worked within the MongoDB module of Testcontainers Java and added test coverage around initialization-script behavior, including a shouldRunInitScript() test — following the project's existing conventions and validating behavior through its Gradle test suite before preparing a pull request.",
+      "Worked within the MongoDB module of Testcontainers Java and added test coverage around initialization-script behavior, including a shouldRunInitScript() test — following the project's existing conventions and validating behavior through its Gradle test suite before opening a pull request against the upstream repository.",
     anatomy: {
       domain:
         "Not a business domain — the subject here is the runtime behavior of an existing library component: whether a MongoDB container correctly executes a configured initialization script on startup.",
@@ -354,8 +345,11 @@ export const projects: Project[] = [
     },
     tech: ["Java", "Gradle", "JUnit", "MongoDB", "Docker", "Testcontainers"],
     result:
-      "A merged understanding of how to read, test, and extend a large, actively maintained open-source Java codebase under its own conventions — distinct from building a project from scratch.",
-    links: [{ label: "Testcontainers Java", href: "https://github.com/testcontainers/testcontainers-java" }],
+      "An open pull request against testcontainers-java, awaiting maintainer review — plus a working understanding of how to read, test, and extend a large, actively maintained open-source Java codebase under its own conventions.",
+    links: [
+      { label: "Testcontainers Java", href: "https://github.com/testcontainers/testcontainers-java" },
+      { label: "Pull Request #11923", href: "https://github.com/testcontainers/testcontainers-java/pull/11923" },
+    ],
     hasCaseStudy: true,
     caseStudy: {
       context: [
@@ -394,7 +388,7 @@ export const projects: Project[] = [
         },
       ],
       result: [
-        "The outcome is a small, focused contribution — a test covering initialization-script behavior in the MongoDB module — prepared and submitted as a pull request against testcontainers-java.",
+        "The outcome is a small, focused contribution — a test covering initialization-script behavior in the MongoDB module — submitted as pull request #11923 against testcontainers-java, currently open and awaiting maintainer review.",
         "Its value isn't the size of the change. It's what the change required: reading someone else's architecture correctly, and adding to it without breaking its conventions.",
       ],
       learnings: [
@@ -407,86 +401,95 @@ export const projects: Project[] = [
     slug: "scan",
     title: "SCAN — Sales & Consumption Analytics Network",
     eyebrow: "Retail Analytics Platform",
-    status: "Prototype",
+    status: "Pilot-stage",
     groups: ["selected", "product"],
     tagline:
-      "A retail analytics concept that evolved from a cashier-side scanning idea into a POS-integration approach, after field research showed retailers already had the infrastructure SCAN assumed it needed to build.",
+      "A retail analytics platform that pivoted from a cashier-side scanning idea to a POS-export pipeline — built, tested, and deployed to a live demo. Real-retailer validation is the explicit next step, not yet complete.",
     problem:
-      "Independent and medium-sized retailers generate receipt-level transaction data that mostly goes unused — there's no simple layer that turns it into product- and basket-level analytics.",
+      "Independent and medium-sized retailers already generate receipt-level transaction data through their POS systems, but that data rarely becomes usable product- or basket-level analytics.",
     challenge:
-      "The real challenge wasn't technical scanning — it was discovering, through retailer interviews, that the original mobile-scanning assumption was solving a problem that existing POS systems had already solved, and redirecting the approach accordingly.",
+      "The real challenge wasn't technical scanning — it was discovering, through retailer interviews, that the original mobile-scanning assumption was solving a problem existing POS systems had already solved, then building a real ingestion pipeline around their exports instead of a new capture flow.",
     architecture: {
       steps: [
-        "POS",
-        "Connector",
-        "Transaction Ingestion",
-        "Normalization",
-        "Analytics",
-        "Dashboard",
+        "POS Export",
+        "Retailer Connector",
+        "Mapping & Validation",
+        "Receipt Reconstruction",
+        "Deterministic Analytics",
+        "Retailer / CCI Portals",
       ],
     },
-    tech: ["React", "Supabase", "ZXing", "APIs", "Analytics Visualization"],
+    tech: ["Java", "Spring Boot", "PostgreSQL", "REST APIs", "React", "Docker"],
     result:
-      "SCAN was selected among 200+ ideas at the Coca-Cola İçecek OneIdea innovation competition. It remains a prototype-stage concept that pivoted from mobile scanning toward POS integration after retailer research — not a deployed analytics product.",
+      "SCAN was selected among 200+ ideas at the Coca-Cola İçecek OneIdea innovation competition. The pivot to POS integration is real and shipped: a Java/Spring Boot backend, a retailer connector, and two analytics portals are built, tested, and deployed to a live demo, verified end to end against a 10,000-basket dataset. Validation against a real retailer's live export is the next milestone, not yet done.",
     hasCaseStudy: true,
+    links: [
+      { label: "Live Demo", href: "https://scan-demo.onrender.com" },
+      { label: "GitHub", href: "https://github.com/HuseynBlv/SCAN" },
+    ],
     caseStudy: {
       context: [
         "SCAN originated from the Coca-Cola İçecek OneIdea innovation competition, where it was selected among more than 200 submitted ideas.",
-        "The starting premise: independent and medium-sized retailers sell products through a POS system, but the receipt-level data behind those sales — what sold, when, in what basket — is rarely turned into usable analytics.",
+        "The starting premise: independent and medium-sized retailers already generate receipt-level transaction data through their POS systems — the challenge is turning that into usable analytics, not capturing new data.",
       ],
       problem: [
         "The first approach assumed retailers needed a new way to capture transaction data: cashier-side mobile barcode scanning, run alongside the existing checkout process.",
-        "That assumption didn't survive contact with actual retailers.",
+        "That assumption didn't survive contact with actual retailers — they already had POS systems generating exactly the data SCAN was trying to capture through scanning.",
       ],
       system: [
-        "Field interviews with retailers surfaced something the initial design hadn't accounted for: most of them already had POS systems generating exactly the transaction data SCAN was trying to capture through scanning.",
-        "That discovery redirected the project from 'build a new data-capture mechanism' to 'integrate with data that already exists' — connecting to POS systems, ingesting receipt-level transactions, and normalizing them into a structure usable for analytics.",
-        "The resulting architecture treats the POS as the source of truth: a connector layer reads transaction data, an ingestion step brings it into SCAN, normalization reconciles differing POS data formats, and an analytics layer turns normalized transactions into dashboards.",
+        "SCAN pivoted from capture to integration: a retailer connector watches for scheduled POS exports and uploads them over authenticated HTTPS; the backend maps columns, reconstructs receipts from transaction lines, deduplicates identical re-uploads, and turns the result into deterministic analytics served through two permission-scoped portals — one for the retailer, one for CCI's approved basket-level view.",
+        "The backend (scan-api) is Java/Spring Boot with JPA and Flyway-managed PostgreSQL migrations. A separate Java service (scan-connector) handles retailer-side file monitoring and upload. The dashboard (scan-app) is React/Vite, talking to scan-api over REST.",
+        "Imports are idempotent by design: re-uploading identical bytes returns the existing import job instead of double-counting, and a receipt reused with different contents is rejected outright rather than silently rewriting history.",
       ],
       engineeringChallenges: [
         "Designing around real retailer infrastructure instead of the infrastructure the initial concept assumed would need to be built.",
-        "Normalizing transaction data — receipt ID, barcode, product, quantity, price, timestamp — from POS sources that don't share a common format.",
-        "Turning raw transaction ingestion into basket-level analytics rather than just a transaction log.",
+        "Making receipt reconstruction and product mapping deterministic and idempotent across retailers whose POS exports don't share a format — no fuzzy matching, no model in the analytics path.",
+        "Proving the pipeline end to end before any real retailer is involved: importing and validating a 10,000-basket, 54,848-line synthetic export against a live deployment.",
       ],
       architecture: {
         steps: [
-          "POS",
-          "Connector",
-          "Transaction Ingestion",
-          "Normalization",
-          "Analytics",
-          "Dashboard",
+          "POS Export",
+          "Retailer Connector",
+          "Mapping & Validation",
+          "Receipt Reconstruction",
+          "Deterministic Analytics",
+          "Retailer / CCI Portals",
         ],
       },
       secondaryDiagram: {
         label: "Concept evolution",
         steps: [
           "Initial Assumption",
-          "Mobile Scanning Prototype",
+          "Mobile Scanning Prototype (Legacy)",
           "Retailer Interviews",
-          "Discovery of Existing POS Infrastructure",
-          "Pivot to POS Integration",
-          "Receipt Ingestion",
-          "Analytics",
+          "POS Integration Pivot",
+          "Connector & Ingestion Pipeline (Built)",
+          "Deployed Demo (Render + Neon)",
         ],
       },
       decisions: [
         {
           title: "Let field research override the original technical plan",
-          body: "The mobile-scanning prototype was a reasonable first hypothesis, but retailer interviews made it clear the harder, more valuable problem was integration, not capture. The architecture changed to match what retailers actually had.",
+          body: "The mobile-scanning prototype was a reasonable first hypothesis, but retailer interviews made it clear the harder, more valuable problem was integration, not capture. It's kept in the repository as an explicitly labeled legacy mode — not presented as the current product.",
         },
         {
-          title: "Treat the POS as the system of record",
-          body: "Rather than SCAN owning transaction capture, POS integration means SCAN is downstream of data retailers already trust, which reduces the operational burden on the retailer side.",
+          title: "Validate against a large synthetic dataset before touching a real retailer",
+          body: "Before any live retailer is involved, the full pipeline is proven against a 10,000-basket dataset with a documented, reproducible result — so the first real integration tests retailer-specific formatting quirks, not the pipeline's core correctness.",
+        },
+        {
+          title: "Treat provisional POS support as provisional until a vendor confirms it",
+          body: "Support for one specific POS export format is explicitly documented as engineering support for an observed generated sample, not a vendor-confirmed data contract — that distinction is kept visible in the project's own docs, not smoothed over for the pitch.",
         },
       ],
       result: [
-        "SCAN's competition recognition (selected among 200+ ideas at Coca-Cola İçecek OneIdea) reflects the strength of the problem and pivot, not a completed or deployed analytics product.",
-        "The project remains at prototype stage: the architecture and data model are designed, and the mobile-scanning version was built and tested, but full POS-integrated ingestion and dashboards are not presented here as shipped or adopted by retailers.",
+        "The POS-integration pipeline is real: built, tested, containerized, and deployed to a live demo (Render + Neon Postgres), verified end to end against a 10,000-basket dataset with 100% product-mapping coverage.",
+        "What hasn't happened yet: validation against a real retailer's live export, and a vendor-confirmed data contract for any specific POS system. Both are explicit next milestones, not completed work.",
+        "The original mobile-scanning prototype still exists in the repository, explicitly labeled legacy — kept for reference, not presented as the current product.",
       ],
       learnings: [
         "The most valuable engineering decision in SCAN wasn't a line of code — it was being willing to discard a working prototype once research showed the underlying assumption was wrong.",
-        "Product engineering and backend engineering meet here: the data model only makes sense once the integration point (POS, not a new scanning flow) is correct.",
+        "Proving a pipeline against a large synthetic dataset before involving a real retailer separates 'does the pipeline work' from 'does this retailer's export match what we assumed' — two different risks that are easy to conflate.",
+        "Being precise about what 'pilot' actually means — provisional engineering support for an observed sample, not a live retailer relationship — matters as much as the engineering itself.",
       ],
     },
   },
@@ -537,7 +540,7 @@ export const projects: Project[] = [
       safeguards:
         "JWT validation happens in a security filter before a request reaches any controller, so authorization isn't something each endpoint has to remember to implement correctly. Controllers, services, and repositories stay separated so validation and business rules run before Spring Data JPA ever writes to PostgreSQL.",
     },
-    tech: ["Java", "Spring Boot", "PostgreSQL", "Spring Data JPA", "JWT", "REST", "Docker"],
+    tech: ["Java", "Spring Boot", "PostgreSQL", "Spring Data JPA", "JWT", "REST"],
     result:
       "A layered backend where controllers, services, and repositories each have one job — with authentication, validation, and exception handling enforced consistently across every endpoint.",
   },
@@ -558,26 +561,32 @@ export const projects: Project[] = [
     },
     tech: ["Go", "Sockets", "Networking", "Concurrency"],
     result:
-      "A working exploration of peer-to-peer networking and concurrency in Go — deliberately outside the Java/Spring stack, to understand networking closer to the transport layer.",
+      "An exploration of peer-to-peer networking and concurrency in Go — deliberately outside the Java/Spring stack, to understand networking closer to the transport layer.",
   },
   {
     slug: "pulsenote",
     title: "PulseNote",
-    eyebrow: "Async AI Stand-up Assistant",
-    status: "Prototype",
+    eyebrow: "Landing Page & Idea Validation",
+    status: "Concept",
     groups: ["product"],
     tagline:
-      "An asynchronous AI stand-up assistant — short voice updates are transcribed and summarized into structured team digests.",
+      "A landing page and private-beta waitlist testing demand for an async, voice-first stand-up tool. The voice-to-digest pipeline itself is a proposed workflow — not yet built.",
     problem:
-      "Synchronous stand-ups don't fit distributed or asynchronous teams well, but async text updates lose the low-effort speed of just talking.",
+      "Synchronous stand-ups interrupt focus, and the usual async substitute — a daily text questionnaire — captures too little signal to be useful on its own.",
     challenge:
-      "Turning unstructured voice input into a structured, consistent team summary reliably enough to be useful without editing.",
+      "Validating whether the idea is worth building before building it: a landing page and waitlist to test real demand, rather than starting with the harder transcription/summarization pipeline.",
     architecture: {
-      steps: ["Voice Update", "Processing / Transcription", "AI Summarization", "Structured Digest", "Team Communication"],
+      steps: [
+        "Voice Update (proposed)",
+        "Transcription (proposed)",
+        "AI Summarization (proposed)",
+        "Structured Digest (proposed)",
+        "Slack Delivery (proposed)",
+      ],
     },
-    tech: ["AI Integrations", "Transcription", "Summarization", "Workflow Automation"],
+    tech: ["Next.js", "TypeScript", "Supabase (Waitlist)"],
     result:
-      "A working prototype of the voice-to-digest pipeline, exploring AI-assisted workflow automation for async team communication.",
+      "A live landing page collecting private-beta signups to gauge demand. No transcription, summarization, or digest delivery is implemented yet — the product itself remains a proposed workflow.",
     links: [{ label: "GitHub", href: "https://github.com/HuseynBlv/PulseNote" }],
   },
   {
@@ -595,7 +604,7 @@ export const projects: Project[] = [
     architecture: {
       steps: ["Weather + Parcel Data", "Risk Scoring (proposed)", "Farmer Alerts (proposed)", "Photo Documentation (proposed)", "Insurance Dashboard (proposed)"],
     },
-    tech: ["Weather Data", "Geospatial Data", "Computer Vision (explored)", "Risk Scoring"],
+    tech: ["Weather Data", "Geospatial Data", "Computer Vision (explored)", "Risk Scoring (proposed)"],
     result:
       "A concept-stage design covering three proposed components — parcel-level risk alerts, photo-assisted damage documentation, and an insurer-facing risk dashboard. No model was trained, no farmers used the system, and no MVP was built — the value was in problem research, solution design, and feasibility analysis.",
   },
