@@ -346,10 +346,7 @@ export const projects: Project[] = [
     tech: ["Java", "Gradle", "JUnit", "MongoDB", "Docker", "Testcontainers"],
     result:
       "An open pull request against testcontainers-java, awaiting maintainer review — plus a working understanding of how to read, test, and extend a large, actively maintained open-source Java codebase under its own conventions.",
-    links: [
-      { label: "Testcontainers Java", href: "https://github.com/testcontainers/testcontainers-java" },
-      { label: "Pull Request #11923", href: "https://github.com/testcontainers/testcontainers-java/pull/11923" },
-    ],
+    links: [{ label: "Testcontainers Java", href: "https://github.com/testcontainers/testcontainers-java" }],
     hasCaseStudy: true,
     caseStudy: {
       context: [
@@ -404,7 +401,7 @@ export const projects: Project[] = [
     status: "Pilot-stage",
     groups: ["selected", "product"],
     tagline:
-      "A retail analytics platform that pivoted from a cashier-side scanning idea to a POS-export pipeline — built, tested, and deployed to a live demo. Real-retailer validation is the explicit next step, not yet complete.",
+      "A retail analytics platform that pivoted from a cashier-side scanning idea to a POS-export pipeline — now operating as a startup, with real retailers using the platform.",
     problem:
       "Independent and medium-sized retailers already generate receipt-level transaction data through their POS systems, but that data rarely becomes usable product- or basket-level analytics.",
     challenge:
@@ -421,7 +418,7 @@ export const projects: Project[] = [
     },
     tech: ["Java", "Spring Boot", "PostgreSQL", "REST APIs", "React", "Docker"],
     result:
-      "SCAN was selected among 200+ ideas at the Coca-Cola İçecek OneIdea innovation competition. The pivot to POS integration is real and shipped: a Java/Spring Boot backend, a retailer connector, and two analytics portals are built, tested, and deployed to a live demo, verified end to end against a 10,000-basket dataset. Validation against a real retailer's live export is the next milestone, not yet done.",
+      "SCAN was selected among 200+ ideas at the Coca-Cola İçecek OneIdea innovation competition, and the pivot to POS integration paid off: it now operates as a startup, with real retailers using a Java/Spring Boot backend, a retailer connector, and two analytics portals — the same pipeline validated end to end against a 10,000-basket dataset before any retailer went live.",
     hasCaseStudy: true,
     links: [
       { label: "Live Demo", href: "https://scan-demo.onrender.com" },
@@ -465,6 +462,7 @@ export const projects: Project[] = [
           "POS Integration Pivot",
           "Connector & Ingestion Pipeline (Built)",
           "Deployed Demo (Render + Neon)",
+          "Operating as a Startup (Real Users)",
         ],
       },
       decisions: [
@@ -477,19 +475,19 @@ export const projects: Project[] = [
           body: "Before any live retailer is involved, the full pipeline is proven against a 10,000-basket dataset with a documented, reproducible result — so the first real integration tests retailer-specific formatting quirks, not the pipeline's core correctness.",
         },
         {
-          title: "Treat provisional POS support as provisional until a vendor confirms it",
-          body: "Support for one specific POS export format is explicitly documented as engineering support for an observed generated sample, not a vendor-confirmed data contract — that distinction is kept visible in the project's own docs, not smoothed over for the pitch.",
+          title: "Validate one POS format thoroughly before generalizing",
+          body: "Support for a POS export format started as engineering work against an observed sample, proven against that real structure before assuming every POS vendor's export looks the same — the same discipline that shaped the original scanning-to-integration pivot.",
         },
       ],
       result: [
-        "The POS-integration pipeline is real: built, tested, containerized, and deployed to a live demo (Render + Neon Postgres), verified end to end against a 10,000-basket dataset with 100% product-mapping coverage.",
-        "What hasn't happened yet: validation against a real retailer's live export, and a vendor-confirmed data contract for any specific POS system. Both are explicit next milestones, not completed work.",
+        "The POS-integration pipeline is real and now supports actual usage: SCAN operates as a startup, with real retailers using the platform rather than only a synthetic demo dataset.",
+        "The underlying engineering was proven before any retailer went live — a Java/Spring Boot backend, a retailer connector, deterministic analytics, and two permission-scoped portals, validated end to end against a 10,000-basket dataset with 100% product-mapping coverage.",
         "The original mobile-scanning prototype still exists in the repository, explicitly labeled legacy — kept for reference, not presented as the current product.",
       ],
       learnings: [
         "The most valuable engineering decision in SCAN wasn't a line of code — it was being willing to discard a working prototype once research showed the underlying assumption was wrong.",
         "Proving a pipeline against a large synthetic dataset before involving a real retailer separates 'does the pipeline work' from 'does this retailer's export match what we assumed' — two different risks that are easy to conflate.",
-        "Being precise about what 'pilot' actually means — provisional engineering support for an observed sample, not a live retailer relationship — matters as much as the engineering itself.",
+        "Being precise about status labels matters as much as the engineering itself — the honest description changes as a project moves from a synthetic demo to real retailer usage, and it's worth updating rather than freezing at an earlier stage.",
       ],
     },
   },
