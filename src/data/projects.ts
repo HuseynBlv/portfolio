@@ -24,6 +24,16 @@ export interface CaseStudySection {
   body: string[];
 }
 
+export interface BackendAnatomy {
+  domain: string;
+  backendControls: string;
+  businessRules: string[];
+  dataStorage: string;
+  stateNote: string;
+  risks: string[];
+  safeguards: string;
+}
+
 export interface Project {
   slug: string;
   title: string;
@@ -35,6 +45,7 @@ export interface Project {
   challenge: string;
   architecture: FlowDiagram;
   stateMachine?: FlowDiagram;
+  anatomy?: BackendAnatomy;
   contribution?: string;
   tech: string[];
   result: string;
@@ -68,11 +79,11 @@ export const projects: Project[] = [
       "Correctly enforcing reservation rules under concurrent requests — preventing double-booking, respecting role-based approval authority, and keeping reservation state, calendar data, and notifications consistent with each other.",
     architecture: {
       steps: [
-        "User",
-        "Reservation API",
-        "Availability + Conflict Logic",
-        "Approval Workflow",
-        "Database",
+        "Reservation Request",
+        "Availability Check",
+        "Conflict Detection",
+        "Approval",
+        "Persistence (PostgreSQL)",
         "Notification",
       ],
     },
@@ -87,6 +98,27 @@ export const projects: Project[] = [
         "Approved / Rejected",
         "Notification",
       ],
+    },
+    anatomy: {
+      domain:
+        "Rooms, bookable time slots, and reservation requests moving through a university approval hierarchy — a requester, and a USG reviewer with the authority to approve or reject.",
+      backendControls:
+        "Whether a reservation is even allowed to exist at a given time. The API enforces availability, checks for conflicts, and restricts who can move a request from pending to approved or rejected.",
+      businessRules: [
+        "A reservation cannot be approved if it overlaps an already-approved reservation for the same room.",
+        "Only a USG reviewer can transition a reservation to approved or rejected — the requester cannot.",
+        "A rejected or cancelled reservation must not continue to hold its time slot.",
+      ],
+      dataStorage:
+        "PostgreSQL. Rooms, time slots, and reservations are modeled as related tables, with reservation status and the requester/reviewer stored as foreign keys — overlap checks run as time-range queries against this schema, not as in-memory filtering.",
+      stateNote:
+        "A reservation is a state machine, not a row that gets overwritten — it can only reach 'approved' by passing through authorization, availability, and conflict checks in order.",
+      risks: [
+        "Two overlapping requests submitted at nearly the same time could both pass an availability check before either is committed, double-booking the room.",
+        "An email could fire for a status the database hasn't actually persisted yet, telling a user their reservation is approved when it isn't.",
+      ],
+      safeguards:
+        "Overlap detection is expressed as a database query, not application-level filtering, so correctness doesn't depend on what the application happens to have loaded in memory. Approval authority is enforced by role at the API layer, and notifications are only triggered after a status change is committed — never alongside it.",
     },
     tech: [
       "Java",
@@ -120,11 +152,11 @@ export const projects: Project[] = [
       ],
       architecture: {
         steps: [
-          "User",
-          "Reservation API",
-          "Availability + Conflict Logic",
-          "Approval Workflow",
-          "Database",
+          "Reservation Request",
+          "Availability Check",
+          "Conflict Detection",
+          "Approval",
+          "Persistence (PostgreSQL)",
           "Notification",
         ],
       },
@@ -178,14 +210,7 @@ export const projects: Project[] = [
     challenge:
       "Designing a service layer where state transitions are enforced by domain rules — a ride can't jump from REQUESTED to COMPLETED, and a driver can't be double-assigned — rather than trusting the client to send valid updates.",
     architecture: {
-      steps: [
-        "Client",
-        "REST API",
-        "Ride Service",
-        "Domain Rules",
-        "Repository",
-        "PostgreSQL",
-      ],
+      steps: ["Ride Request", "Driver Assignment", "Ride State Machine", "Persistence (PostgreSQL)"],
     },
     stateMachine: {
       steps: [
@@ -195,6 +220,27 @@ export const projects: Project[] = [
         "IN_PROGRESS",
         "COMPLETED",
       ],
+    },
+    anatomy: {
+      domain:
+        "Riders, drivers, and a ride as a single stateful entity that has to move through a fixed sequence of stages.",
+      backendControls:
+        "Whether a given ride-state transition is legal right now, and who — rider or driver — is allowed to trigger it. The REST API never accepts a state change directly; it routes through a ride service that owns that decision.",
+      businessRules: [
+        "A ride can only reach DRIVER_ASSIGNED if a driver exists and isn't already active on another ride.",
+        "IN_PROGRESS can't be reached without first passing through DRIVER_ASSIGNED and DRIVER_ARRIVING.",
+        "Only the assigned driver can advance a ride's status; only the requesting rider can cancel it.",
+      ],
+      dataStorage:
+        "PostgreSQL, with rides, drivers, and users as related tables. Ride status is stored as an enumerated field that's validated against allowed transitions before every write, not freely overwritten by whatever a client sends.",
+      stateNote:
+        "REQUESTED → DRIVER_ASSIGNED → DRIVER_ARRIVING → IN_PROGRESS → COMPLETED — enforced by the domain layer, not by client convention.",
+      risks: [
+        "A driver could end up assigned to two active rides if assignment and the ride-state update weren't applied as a single operation.",
+        "A client could attempt to jump straight from REQUESTED to COMPLETED, skipping assignment entirely.",
+      ],
+      safeguards:
+        "State transitions are validated in the service/domain layer before they reach persistence, so an invalid jump is rejected no matter which client sent it. Driver assignment and the corresponding ride-state update are wrapped in a single transactional operation, so the system can never persist an assigned driver on a ride still marked REQUESTED.",
     },
     tech: [
       "Java",
@@ -228,14 +274,7 @@ export const projects: Project[] = [
         "Designing exception handling and validation that gives callers a precise reason a request was rejected, instead of a generic failure.",
       ],
       architecture: {
-        steps: [
-          "Client",
-          "REST API",
-          "Ride Service",
-          "Domain Rules",
-          "Repository",
-          "PostgreSQL",
-        ],
+        steps: ["Ride Request", "Driver Assignment", "Ride State Machine", "Persistence (PostgreSQL)"],
       },
       secondaryDiagram: {
         label: "Ride lifecycle (state machine)",
@@ -281,14 +320,32 @@ export const projects: Project[] = [
     architecture: {
       steps: [
         "Existing MongoDB Module",
-        "Init-Script Behavior",
+        "Init-Script Behavior (Under Test)",
         "shouldRunInitScript() Test",
-        "Gradle Test Suite",
-        "Pull Request",
+        "Gradle Verification",
       ],
     },
     contribution:
       "Worked within the MongoDB module of Testcontainers Java and added test coverage around initialization-script behavior, including a shouldRunInitScript() test — following the project's existing conventions and validating behavior through its Gradle test suite before preparing a pull request.",
+    anatomy: {
+      domain:
+        "Not a business domain — the subject here is the runtime behavior of an existing library component: whether a MongoDB container correctly executes a configured initialization script on startup.",
+      backendControls:
+        "Nothing at runtime — the contribution doesn't control production behavior, it controls what's verified. It determines whether one specific piece of container-startup behavior is provably correct going forward.",
+      businessRules: [
+        "Not applicable in the product sense. The invariant being enforced is a library guarantee: if an init script is configured, Testcontainers must run it before the container is considered ready.",
+      ],
+      dataStorage:
+        "None of its own. The test spins up a real, disposable MongoDB container as its subject, exercises it, and tears it down — nothing outlives the test run.",
+      stateNote:
+        "Module exists → behavior identified as untested → test written against a real container → verified by Gradle → submitted as a pull request.",
+      risks: [
+        "A test written against a mocked MongoDB would pass even if the real init-script behavior were broken — exactly the gap this contribution closes.",
+        "A timing-dependent or flaky test could produce false failures unrelated to the actual behavior being verified.",
+      ],
+      safeguards:
+        "The test runs against a real MongoDB container rather than a mock, so it validates actual behavior instead of an assumption about it, and it follows the MongoDB module's existing conventions so it integrates into the project's Gradle suite without special-casing.",
+    },
     tech: ["Java", "Gradle", "JUnit", "MongoDB", "Docker", "Testcontainers"],
     result:
       "A merged understanding of how to read, test, and extend a large, actively maintained open-source Java codebase under its own conventions — distinct from building a project from scratch.",
@@ -315,10 +372,9 @@ export const projects: Project[] = [
       architecture: {
         steps: [
           "Existing MongoDB Module",
-          "Init-Script Behavior",
+          "Init-Script Behavior (Under Test)",
           "shouldRunInitScript() Test",
-          "Gradle Test Suite",
-          "Pull Request",
+          "Gradle Verification",
         ],
       },
       decisions: [
@@ -441,14 +497,7 @@ export const projects: Project[] = [
     challenge:
       "Structuring the service so persistence, business logic, and API contracts stay separated, while JWT-based authentication and authorization gate every protected resource consistently.",
     architecture: {
-      steps: [
-        "HTTP Request",
-        "Controller",
-        "Service Layer",
-        "Business Logic",
-        "Repository",
-        "PostgreSQL",
-      ],
+      steps: ["Authenticated Request", "Service Logic", "Transaction Validation", "Persistence (PostgreSQL)"],
     },
     stateMachine: {
       label: "Authentication flow",
@@ -460,6 +509,27 @@ export const projects: Project[] = [
         "Security Filter",
         "Protected Resource",
       ],
+    },
+    anatomy: {
+      domain:
+        "A single user's financial activity — transactions and the categories they belong to — scoped strictly to whoever is authenticated.",
+      backendControls:
+        "Whether the caller is who they claim to be, whether they own the data they're asking for, and whether a transaction is well-formed before it's allowed to reach PostgreSQL.",
+      businessRules: [
+        "A user can only read or write their own transactions and categories, never another user's.",
+        "A transaction must reference a valid category and an authenticated owner before it's persisted.",
+        "Requests without a valid JWT are rejected before they reach any business logic.",
+      ],
+      dataStorage:
+        "PostgreSQL via Spring Data JPA. Users, categories, and transactions are modeled as related entities, with ownership enforced at the query level — not just filtered out of the response afterward.",
+      stateNote:
+        "The meaningful state here isn't the transaction — it's the request's authorization state: unauthenticated → credentials verified → JWT issued → authorized on every subsequent request.",
+      risks: [
+        "A request without a valid JWT could reach a controller meant only for authenticated users, if authorization were checked per-endpoint instead of centrally.",
+        "A transaction could be persisted referencing a category or user that doesn't exist, corrupting downstream reads.",
+      ],
+      safeguards:
+        "JWT validation happens in a security filter before a request reaches any controller, so authorization isn't something each endpoint has to remember to implement correctly. Controllers, services, and repositories stay separated so validation and business rules run before Spring Data JPA ever writes to PostgreSQL.",
     },
     tech: ["Java", "Spring Boot", "PostgreSQL", "Spring Data JPA", "JWT", "REST", "Docker"],
     result:

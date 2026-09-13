@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Project } from "@/data/projects";
 import { StatusBadge } from "./StatusBadge";
 import { FlowDiagram } from "./FlowDiagram";
+import { BackendAnatomy } from "./BackendAnatomy";
 import { cn } from "@/lib/utils";
 
 export function ProjectAccordion({ items }: { items: Project[] }) {
@@ -53,55 +54,65 @@ export function ProjectAccordion({ items }: { items: Project[] }) {
                   transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                   className="overflow-hidden"
                 >
-                  <div className="grid grid-cols-1 gap-8 pb-8 md:grid-cols-12">
-                    <div className="md:col-span-7">
-                      <p className="max-w-lg text-[14px] leading-relaxed text-text-secondary">
-                        {project.tagline}
-                      </p>
+                  <div className="pb-8">
+                    <div className="grid grid-cols-1 gap-8 md:grid-cols-12">
+                      <div className="md:col-span-7">
+                        <p className="max-w-lg text-[14px] leading-relaxed text-text-secondary">
+                          {project.tagline}
+                        </p>
 
-                      <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <div className="font-mono text-[11px] uppercase tracking-widest text-text-tertiary">
-                            Challenge
+                        {!project.anatomy && (
+                          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                            <div>
+                              <div className="font-mono text-[11px] uppercase tracking-widest text-text-tertiary">
+                                Challenge
+                              </div>
+                              <p className="mt-1.5 text-[13px] leading-relaxed text-text-secondary">
+                                {project.challenge}
+                              </p>
+                            </div>
+                            <div>
+                              <div className="font-mono text-[11px] uppercase tracking-widest text-text-tertiary">
+                                Result
+                              </div>
+                              <p className="mt-1.5 text-[13px] leading-relaxed text-text-secondary">
+                                {project.result}
+                              </p>
+                            </div>
                           </div>
-                          <p className="mt-1.5 text-[13px] leading-relaxed text-text-secondary">
-                            {project.challenge}
-                          </p>
-                        </div>
-                        <div>
-                          <div className="font-mono text-[11px] uppercase tracking-widest text-text-tertiary">
-                            Result
-                          </div>
-                          <p className="mt-1.5 text-[13px] leading-relaxed text-text-secondary">
-                            {project.result}
-                          </p>
-                        </div>
+                        )}
                       </div>
-
-                      <div className="mt-5 flex flex-wrap gap-2">
-                        {project.tech.map((t) => (
-                          <span
-                            key={t}
-                            className="rounded-full border border-border px-2.5 py-1 font-mono text-[11px] text-text-secondary"
-                          >
-                            {t}
-                          </span>
-                        ))}
+                      <div className="md:col-span-5">
+                        <FlowDiagram data={project.architecture} compact />
                       </div>
+                    </div>
 
-                      {project.hasCaseStudy && (
-                        <Link
-                          href={`/projects/${project.slug}`}
-                          className="mt-5 inline-flex items-center gap-1.5 text-[13px] font-medium text-accent transition-opacity hover:opacity-80"
+                    {project.anatomy && (
+                      <div className="mt-8">
+                        <BackendAnatomy anatomy={project.anatomy} stateMachine={project.stateMachine} />
+                      </div>
+                    )}
+
+                    <div className="mt-6 flex flex-wrap gap-2">
+                      {project.tech.map((t) => (
+                        <span
+                          key={t}
+                          className="rounded-full border border-border px-2.5 py-1 font-mono text-[11px] text-text-secondary"
                         >
-                          Full case study
-                          <span aria-hidden>→</span>
-                        </Link>
-                      )}
+                          {t}
+                        </span>
+                      ))}
                     </div>
-                    <div className="md:col-span-5">
-                      <FlowDiagram data={project.architecture} compact />
-                    </div>
+
+                    {project.hasCaseStudy && (
+                      <Link
+                        href={`/projects/${project.slug}`}
+                        className="mt-5 inline-flex items-center gap-1.5 text-[13px] font-medium text-accent transition-opacity hover:opacity-80"
+                      >
+                        Full case study
+                        <span aria-hidden>→</span>
+                      </Link>
+                    )}
                   </div>
                 </motion.div>
               )}

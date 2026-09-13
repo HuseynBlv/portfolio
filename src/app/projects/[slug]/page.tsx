@@ -8,6 +8,7 @@ import { Reveal } from "@/components/Reveal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { FlowDiagram } from "@/components/FlowDiagram";
 import { StateMachine } from "@/components/StateMachine";
+import { BackendAnatomy } from "@/components/BackendAnatomy";
 import { CaseStudySection } from "@/components/CaseStudySection";
 import { getCaseStudyProjects, getProjectBySlug } from "@/data/projects";
 
@@ -105,6 +106,14 @@ export default async function ProjectPage({
                     {l.label} ↗
                   </a>
                 ))}
+              </div>
+            </Reveal>
+          )}
+
+          {project.anatomy && (
+            <Reveal delay={0.23}>
+              <div className="mt-10">
+                <BackendAnatomy anatomy={project.anatomy} stateMachine={project.stateMachine} />
               </div>
             </Reveal>
           )}

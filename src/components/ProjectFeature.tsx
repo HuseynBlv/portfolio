@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Project } from "@/data/projects";
 import { StatusBadge } from "./StatusBadge";
 import { FlowDiagram } from "./FlowDiagram";
+import { BackendAnatomy } from "./BackendAnatomy";
 import { Reveal } from "./Reveal";
 
 export function ProjectFeature({ project, index }: { project: Project; index: number }) {
@@ -35,57 +36,34 @@ export function ProjectFeature({ project, index }: { project: Project; index: nu
             </p>
           </Reveal>
 
-          <Reveal delay={0.13}>
-            <dl className="mt-7 flex flex-col gap-4 max-w-lg">
-              <div>
-                <dt className="font-mono text-[11px] uppercase tracking-widest text-text-tertiary">
-                  Problem
-                </dt>
-                <dd className="mt-1.5 text-[14px] leading-relaxed text-text-secondary">
-                  {project.problem}
-                </dd>
-              </div>
-              <div>
-                <dt className="font-mono text-[11px] uppercase tracking-widest text-text-tertiary">
-                  Engineering challenge
-                </dt>
-                <dd className="mt-1.5 text-[14px] leading-relaxed text-text-secondary">
-                  {project.challenge}
-                </dd>
-              </div>
-              <div>
-                <dt className="font-mono text-[11px] uppercase tracking-widest text-text-tertiary">
-                  Result
-                </dt>
-                <dd className="mt-1.5 text-[14px] leading-relaxed text-text-secondary">
-                  {project.result}
-                </dd>
-              </div>
-            </dl>
-          </Reveal>
-
-          <Reveal delay={0.16}>
-            <div className="mt-6 flex flex-wrap gap-2">
-              {project.tech.map((t) => (
-                <span
-                  key={t}
-                  className="rounded-full border border-border px-2.5 py-1 font-mono text-[11px] text-text-secondary"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
-          </Reveal>
-
-          {project.hasCaseStudy && (
-            <Reveal delay={0.2}>
-              <Link
-                href={`/projects/${project.slug}`}
-                className="mt-7 inline-flex items-center gap-1.5 text-[14px] font-medium text-accent transition-opacity hover:opacity-80"
-              >
-                Read full case study
-                <span aria-hidden>→</span>
-              </Link>
+          {!project.anatomy && (
+            <Reveal delay={0.13}>
+              <dl className="mt-7 flex flex-col gap-4 max-w-lg">
+                <div>
+                  <dt className="font-mono text-[11px] uppercase tracking-widest text-text-tertiary">
+                    Problem
+                  </dt>
+                  <dd className="mt-1.5 text-[14px] leading-relaxed text-text-secondary">
+                    {project.problem}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-mono text-[11px] uppercase tracking-widest text-text-tertiary">
+                    Engineering challenge
+                  </dt>
+                  <dd className="mt-1.5 text-[14px] leading-relaxed text-text-secondary">
+                    {project.challenge}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-mono text-[11px] uppercase tracking-widest text-text-tertiary">
+                    Result
+                  </dt>
+                  <dd className="mt-1.5 text-[14px] leading-relaxed text-text-secondary">
+                    {project.result}
+                  </dd>
+                </div>
+              </dl>
             </Reveal>
           )}
         </div>
@@ -96,6 +74,39 @@ export function ProjectFeature({ project, index }: { project: Project; index: nu
           </Reveal>
         </div>
       </div>
+
+      {project.anatomy && (
+        <Reveal delay={0.14}>
+          <div className="mt-10">
+            <BackendAnatomy anatomy={project.anatomy} stateMachine={project.stateMachine} />
+          </div>
+        </Reveal>
+      )}
+
+      <Reveal delay={0.16}>
+        <div className="mt-7 flex flex-wrap gap-2">
+          {project.tech.map((t) => (
+            <span
+              key={t}
+              className="rounded-full border border-border px-2.5 py-1 font-mono text-[11px] text-text-secondary"
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      </Reveal>
+
+      {project.hasCaseStudy && (
+        <Reveal delay={0.2}>
+          <Link
+            href={`/projects/${project.slug}`}
+            className="mt-6 inline-flex items-center gap-1.5 text-[14px] font-medium text-accent transition-opacity hover:opacity-80"
+          >
+            Read full case study
+            <span aria-hidden>→</span>
+          </Link>
+        </Reveal>
+      )}
     </div>
   );
 }
