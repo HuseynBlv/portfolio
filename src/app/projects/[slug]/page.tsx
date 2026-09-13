@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { FlowDiagram } from "@/components/FlowDiagram";
 import { StateMachine } from "@/components/StateMachine";
 import { BackendAnatomy } from "@/components/BackendAnatomy";
+import { RideStateMachine } from "@/components/RideStateMachine";
 import { CaseStudySection } from "@/components/CaseStudySection";
 import { getCaseStudyProjects, getProjectBySlug } from "@/data/projects";
 
@@ -165,6 +166,7 @@ export default async function ProjectPage({
                   <StateMachine data={cs.secondaryDiagram} />
                 </div>
               )}
+              {project.slug === "rideflow" && <RideStateMachine />}
             </div>
           </CaseStudySection>
 

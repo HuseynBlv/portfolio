@@ -200,47 +200,48 @@ export const projects: Project[] = [
   {
     slug: "rideflow",
     title: "RideFlow",
-    eyebrow: "Backend Domain Study",
+    eyebrow: "State Machine & Domain Modeling",
     status: "Built",
     groups: ["selected", "backend"],
     tagline:
-      "A backend-focused ride-hailing system built to study the domain architecture behind applications like Uber — riders, drivers, assignment, and trip state as enforced backend rules.",
+      "A backend-only ride-hailing service built around one problem: modeling a ride as a strict state machine so an invalid combination of states — like a completed ride with no driver — is structurally impossible.",
     problem:
-      "Ride-hailing looks simple from the outside, but the backend has to keep a trip's state, driver assignment, and business rules consistent through every stage of the ride.",
+      "A ride isn't a record you update — it's a sequence with real preconditions. A ride can't be IN_PROGRESS without a driver, and two drivers can't both win the same ride if they accept it within milliseconds of each other.",
     challenge:
-      "Designing a service layer where state transitions are enforced by domain rules — a ride can't jump from REQUESTED to COMPLETED, and a driver can't be double-assigned — rather than trusting the client to send valid updates.",
+      "Enforcing every ride-state transition in one place, under real concurrency, so an invalid jump — or a second driver accepting a ride someone else just took — is rejected before it reaches PostgreSQL, not caught after the fact.",
     architecture: {
-      steps: ["Ride Request", "Driver Assignment", "Ride State Machine", "Persistence (PostgreSQL)"],
+      steps: [
+        "Client",
+        "REST Controller",
+        "Ride Service",
+        "Domain Rules (RideStateService)",
+        "Repository (Pessimistic Lock)",
+        "PostgreSQL",
+      ],
     },
     stateMachine: {
-      steps: [
-        "REQUESTED",
-        "DRIVER_ASSIGNED",
-        "DRIVER_ARRIVING",
-        "IN_PROGRESS",
-        "COMPLETED",
-      ],
+      steps: ["REQUESTED", "MATCHING", "DRIVER_ASSIGNED", "DRIVER_ARRIVING", "IN_PROGRESS", "COMPLETED"],
     },
     anatomy: {
       domain:
-        "Riders, drivers, and a ride as a single stateful entity that has to move through a fixed sequence of stages.",
+        "A ride request moving between two people — a rider and a driver — through a strict sequence of states, from first request to a paid, completed trip.",
       backendControls:
-        "Whether a given ride-state transition is legal right now, and who — rider or driver — is allowed to trigger it. The REST API never accepts a state change directly; it routes through a ride service that owns that decision.",
+        "Whether a given ride is even allowed to change status right now, and whether the caller making the request is actually the driver assigned to that ride.",
       businessRules: [
-        "A ride can only reach DRIVER_ASSIGNED if a driver exists and isn't already active on another ride.",
-        "IN_PROGRESS can't be reached without first passing through DRIVER_ASSIGNED and DRIVER_ARRIVING.",
-        "Only the assigned driver can advance a ride's status; only the requesting rider can cancel it.",
+        "A ride can only move to DRIVER_ASSIGNED from MATCHING — never directly from REQUESTED.",
+        "IN_PROGRESS can be reached from DRIVER_ASSIGNED or DRIVER_ARRIVING, but from nowhere else.",
+        "Only the driver already assigned to a ride can start or complete it; a second driver accepting the same ride is rejected, not queued.",
       ],
       dataStorage:
-        "PostgreSQL, with rides, drivers, and users as related tables. Ride status is stored as an enumerated field that's validated against allowed transitions before every write, not freely overwritten by whatever a client sends.",
+        "PostgreSQL. Ride, rider, and driver are related tables; status is a single enumerated column guarded by a version field for optimistic locking, and every transition is also written to a separate ride_events table as an audit log.",
       stateNote:
-        "REQUESTED → DRIVER_ASSIGNED → DRIVER_ARRIVING → IN_PROGRESS → COMPLETED — enforced by the domain layer, not by client convention.",
+        "REQUESTED → MATCHING → DRIVER_ASSIGNED → DRIVER_ARRIVING → IN_PROGRESS → COMPLETED — each name is the domain's own vocabulary for what's happening, not a generic status flag.",
       risks: [
-        "A driver could end up assigned to two active rides if assignment and the ride-state update weren't applied as a single operation.",
-        "A client could attempt to jump straight from REQUESTED to COMPLETED, skipping assignment entirely.",
+        "Two drivers accepting the same ride within milliseconds of each other — the second acceptance has to lose outright, not silently overwrite the first.",
+        "A retried request (a driver's app resending an accept call after a dropped connection) could be misread as a duplicate, invalid action instead of the same action arriving twice.",
       ],
       safeguards:
-        "State transitions are validated in the service/domain layer before they reach persistence, so an invalid jump is rejected no matter which client sent it. Driver assignment and the corresponding ride-state update are wrapped in a single transactional operation, so the system can never persist an assigned driver on a ride still marked REQUESTED.",
+        "Ride acceptance takes a pessimistic database lock on the ride row before checking or changing anything, so two simultaneous accepts can't both succeed. Every transition runs inside a single @Transactional method, and a repeated accept from the same driver is treated as idempotent instead of an error.",
     },
     tech: [
       "Java",
@@ -250,58 +251,63 @@ export const projects: Project[] = [
       "JWT",
       "Validation",
       "Exception Handling",
+      "JUnit",
     ],
     result:
-      "A backend that models the full ride lifecycle as an enforced state machine — invalid transitions are rejected by the domain layer, not just by convention.",
+      "Every ride mutation funnels through one guarded method that whitelists legal source states per transition — an invalid jump throws immediately, before it reaches persistence, and a unit test asserts exactly that.",
     hasCaseStudy: true,
     caseStudy: {
       context: [
-        "RideFlow started as a question, not a product idea: what does the backend behind an app like Uber actually have to get right? Not the map UI — the domain logic underneath it.",
-        "The project models the core actors and lifecycle of a ride-hailing platform: users, drivers, ride requests, assignment, and trip completion.",
+        "RideFlow isn't a rider app or a maps UI — it's the backend underneath one: the service that decides whether a given change to a ride is actually allowed to happen.",
+        "The domain is deliberately small — riders, drivers, rides — so the state machine and the concurrency around it could be the real subject, not scaffolding around a bigger feature set.",
       ],
       problem: [
-        "A ride isn't a single record that gets updated — it's a sequence of states, each with its own preconditions. A ride can't be marked IN_PROGRESS if no driver was ever assigned, and a driver can't be assigned to two active rides at once.",
-        "The engineering problem is keeping that sequence valid under real usage: concurrent requests, partial failures, and clients that might send updates out of order.",
+        "A ride moves through a fixed sequence — requested, matched, assigned, in progress, completed — and each step has real preconditions. A ride can't be IN_PROGRESS if no driver was ever assigned, and it can't be COMPLETED twice.",
+        "The harder version of that problem is concurrency: two drivers can try to accept the same ride within milliseconds of each other, and exactly one of them has to win.",
       ],
       system: [
-        "RideFlow is structured in layers: a REST API for clients, a ride service that owns business logic, a domain-rules layer that validates transitions, and a repository layer backed by PostgreSQL.",
-        "Authentication and authorization gate who can act on a ride — a rider can request and cancel, a driver can accept and update trip status, and neither can act outside their role.",
-        "Transactional operations ensure that a driver assignment and the corresponding ride-state update happen together, so the system never ends up with an assigned driver on a ride still marked REQUESTED.",
+        "Every ride mutation goes through the same four layers: a REST controller that checks the caller's role, a RideService that owns the use case, a RideStateService that owns exactly one thing — whether a transition is legal — and a repository that persists the result.",
+        "RideStateService exposes one method per business action (assign a driver, start a ride, complete a ride...), and every one of them calls a single private guard: check the ride's current status against an explicit whitelist of allowed source states, or throw.",
+        "Acceptance is the one place two clients can race for the same row, so acceptRide loads the ride with a database-level write lock before touching it. The Ride entity also carries a version column as a second line of defense against lost updates.",
       ],
       engineeringChallenges: [
-        "Enforcing valid state transitions (REQUESTED → DRIVER_ASSIGNED → DRIVER_ARRIVING → IN_PROGRESS → COMPLETED) at the service layer, so invalid jumps are rejected before they reach the database.",
-        "Driver assignment logic that avoids assigning one driver to multiple concurrent active rides.",
-        "Designing exception handling and validation that gives callers a precise reason a request was rejected, instead of a generic failure.",
+        "Making 'this transition is illegal' a single, centrally-enforced rule instead of a scattered set of if-checks repeated in every method that touches ride status.",
+        "Serializing ride acceptance so two drivers racing for the same ride can't both succeed, without locking the entire rides table for unrelated rides.",
+        "Treating a retried request from the same driver as a no-op instead of a conflict — a flaky client resending an accept call is normal, not an attack.",
       ],
       architecture: {
-        steps: ["Ride Request", "Driver Assignment", "Ride State Machine", "Persistence (PostgreSQL)"],
-      },
-      secondaryDiagram: {
-        label: "Ride lifecycle (state machine)",
         steps: [
-          "REQUESTED",
-          "DRIVER_ASSIGNED",
-          "DRIVER_ARRIVING",
-          "IN_PROGRESS",
-          "COMPLETED",
+          "Client",
+          "REST Controller",
+          "Ride Service",
+          "Domain Rules (RideStateService)",
+          "Repository (Pessimistic Lock)",
+          "PostgreSQL",
         ],
       },
       decisions: [
         {
-          title: "State transitions live in the domain layer, not the controller",
-          body: "Ride-state changes are validated by domain rules, not by the API layer accepting whatever status a client sends. This keeps the rules enforceable regardless of which client — mobile, web, or an internal tool — is calling the API.",
+          title: "One guarded method, not one if-check per endpoint",
+          body: "Every legal transition is expressed as a call into a single private guard inside RideStateService: check the current status against an explicit set of allowed sources, or throw. A controller or service method never decides for itself whether a status change is valid — it calls the specific transition and lets the guard throw. That's the actual mechanism that makes COMPLETED → IN_PROGRESS impossible: COMPLETED is never in the allowed-source set for any transition.",
         },
         {
-          title: "Modeling this as a domain problem, not a CRUD problem",
-          body: "Rides, drivers, and assignments are related entities with rules between them, not independent tables updated in isolation. The service layer exists specifically to own those rules.",
+          title: "Lock the row before you decide, not after",
+          body: "acceptRide takes a pessimistic write lock on the ride (and the driver) before checking status or availability. Deciding first and locking to save the result later would leave a window where two transactions could both read MATCHING and both think they won.",
+        },
+        {
+          title: "An IllegalStateException is still just a 409",
+          body: "Invalid transitions raise a plain IllegalStateException from the domain layer. A global exception handler maps it — along with a dedicated ConflictException for things like “this ride isn't yours” — to HTTP 409, so the caller gets a normal API error, not a stack trace.",
         },
       ],
       result: [
-        "RideFlow is a built exploration of ride-hailing backend architecture — not a deployed or commercially operated service. Its value is in the domain modeling and the enforced state machine underneath it.",
+        "The state machine holds: every transition in the codebase funnels through RideStateService, and a unit test asserts that an out-of-order transition — completing a ride that was never assigned or started — throws immediately instead of silently succeeding.",
+        "One honest gap: DRIVER_ARRIVING is fully modeled and guarded in RideStateService, but no controller endpoint currently triggers it. The domain layer supports a transition the API surface doesn't expose yet — a smaller problem than not having modeled it at all.",
+        "This is a built backend, not a deployed or commercially operated ride-hailing service.",
       ],
       learnings: [
-        "Most of what makes a ride-hailing backend hard isn't the API surface — it's guaranteeing that the system can never represent an invalid combination of states, like an in-progress ride with no driver.",
-        "Designing the state machine before the endpoints made the rest of the service layer straightforward to reason about.",
+        "Centralizing every state transition behind one guarded method did more for correctness than any individual validation check — it made 'is this allowed' a question with exactly one answer, checked in exactly one place.",
+        "Modeling the domain — rider, driver, ride, and the specific verbs that move a ride between states — before writing endpoints made the service layer's boundaries obvious: RideService owns use cases, RideStateService owns legality, the repository owns persistence.",
+        "Concurrency isn't a separate concern from domain modeling. The fact that two drivers can race for one ride is itself a business rule, and it belongs next to the other business rules, not bolted on as a database detail.",
       ],
     },
   },
