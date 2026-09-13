@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { FlowDiagram } from "@/components/FlowDiagram";
 import { StateMachine } from "@/components/StateMachine";
 import { BackendAnatomy } from "@/components/BackendAnatomy";
-import { RideStateMachine } from "@/components/RideStateMachine";
+import { RideBackendSimulator } from "@/components/RideBackendSimulator";
 import { CaseStudySection } from "@/components/CaseStudySection";
 import { getCaseStudyProjects, getProjectBySlug } from "@/data/projects";
 
@@ -157,17 +157,20 @@ export default async function ProjectPage({
           </CaseStudySection>
 
           <CaseStudySection index="05" title="Architecture">
-            <div className="flex flex-col gap-10">
-              <div className="max-w-sm">
-                <FlowDiagram data={cs.architecture} />
-              </div>
-              {cs.secondaryDiagram && (
-                <div className="rounded-lg border border-border bg-surface p-6">
-                  <StateMachine data={cs.secondaryDiagram} />
+            {project.slug === "rideflow" ? (
+              <RideBackendSimulator />
+            ) : (
+              <div className="flex flex-col gap-10">
+                <div className="max-w-sm">
+                  <FlowDiagram data={cs.architecture} />
                 </div>
-              )}
-              {project.slug === "rideflow" && <RideStateMachine />}
-            </div>
+                {cs.secondaryDiagram && (
+                  <div className="rounded-lg border border-border bg-surface p-6">
+                    <StateMachine data={cs.secondaryDiagram} />
+                  </div>
+                )}
+              </div>
+            )}
           </CaseStudySection>
 
           <CaseStudySection index="06" title="Key Decisions">
