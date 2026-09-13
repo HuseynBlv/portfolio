@@ -71,7 +71,7 @@ export function Hero() {
         <Reveal delay={0.3}>
           <div className="mt-14 flex flex-wrap gap-x-8 gap-y-3 border-t border-border pt-6 font-mono text-[11px] uppercase tracking-widest text-text-tertiary">
             <span>UFAZ · Strasbourg dual-degree</span>
-            <span>~98/100 first-year GPA</span>
+            <span>~98/100 GPA</span>
             <span>Java-first backend engineering</span>
           </div>
         </Reveal>
